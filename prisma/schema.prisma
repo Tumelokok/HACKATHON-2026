@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentState {
+  CREATED
+  ASSESSING
+  ACTIVE
+  RESPONDING
+  MONITORING
+  ESCALATED
+  RESOLVED
+  CANCELLED
+}
+
+enum ActionStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+  EXECUTED
+  FAILED
+  SUPPRESSED
+}
+
+enum ConflictStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+}
+
+enum AssessmentSource {
+  RULE_ENGINE
+  AGENT
+  HUMAN
+}
+
+model Report {
+  id                         String    @id @default(cuid())
+  reportId                   String    @unique
+  processingOrder            Int
+  timestampRaw               String
+  timestampParsed            DateTime?
+  locationRaw                String
+  locationNormalized         String
+  categoryRaw                String
+  categoryNormalized         String
+  reportedSeverityRaw        String
+  reportedSeverityNormalized String
+  description                String
+  reporterTypeRaw            String
+  reporterTypeNormalized     String
+
+  incidentId          String?
+  isDuplicate         Boolean @default(false)
+  duplicateOfReportId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  triggeringTransitions StateTransition[] @relation("TriggeringReport")
+  auditEvents           AuditEvent[]
+
+  conflictReports ConflictReport[]
+
+  @@index([incidentId])
+  @@index([processingOrder])
+  @@index([locationNormalized])
+  @@index([categoryNormalized])
+}
+
+model Incident {
+  id                    String        @id @default(cuid())
+  incidentNumber        String        @unique
+  category              String
+  location              String
+  severity              Severity
+  severityConfidence    Float
+  state                 IncidentState
+  stateReason           String
+  correlationConfidence Float
+  requiresHumanReview   Boolean       @default(false)
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  resolvedAt       DateTime?
+  resolutionReason String?
+
+  reports             Report[]
+  severityAssessments SeverityAssessment[]
+  stateTransitions    StateTransition[]
+  conflicts           Conflict[]
+  actions             Action[]
+  auditEvents         AuditEvent[]
+
+  @@index([state])
+  @@index([severity])
+  @@index([requiresHumanReview])
+  @@index([category])
+  @@index([location])
+}
+
+model SeverityAssessment {
+  id                String           @id @default(cuid())
+  incidentId        String
+  level             Severity
+  confidence        Float
+  reason            String
+  evidenceReportIds String[]
+  createdAt         DateTime         @default(now())
+  source            AssessmentSource
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId])
+  @@index([createdAt])
+}
+
+model StateTransition {
+  id                 String         @id @default(cuid())
+  incidentId         String
+  fromState          IncidentState?
+  toState            IncidentState
+  reason             String
+  triggeringReportId String?
+  triggeringActionId String?
+  actor              String
+  createdAt          DateTime       @default(now())
+
+  incident         Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  triggeringReport Report?  @relation("TriggeringReport", fields: [triggeringReportId], references: [id], onDelete: SetNull)
+  triggeringAction Action?  @relation("TriggeringAction", fields: [triggeringActionId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId])
+  @@index([triggeringReportId])
+  @@index([createdAt])
+}
+
+model Conflict {
+  id                  String         @id @default(cuid())
+  incidentId          String
+  type                String
+  description         String
+  status              ConflictStatus @default(OPEN)
+  requiresHumanReview Boolean        @default(false)
+  resolution          String?
+  resolvedBy          String?
+  resolvedAt          DateTime?
+  createdAt           DateTime       @default(now())
+
+  incident Incident         @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  reports  ConflictReport[]
+
+  @@index([incidentId])
+  @@index([status])
+  @@index([requiresHumanReview])
+}
+
+model ConflictReport {
+  conflictId String
+  reportId   String
+
+  conflict Conflict @relation(fields: [conflictId], references: [id], onDelete: Cascade)
+  report   Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@id([conflictId, reportId])
+  @@index([reportId])
+}
+
+model Action {
+  id            String       @id @default(cuid())
+  incidentId    String
+  type          String
+  service       String
+  status        ActionStatus @default(PROPOSED)
+  reason        String
+  requestedBy   String
+  approvedBy    String?
+  executedAt    DateTime?
+  result        String?
+  failureReason String?
+  createdAt     DateTime     @default(now())
+
+  incident              Incident          @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  triggeringTransitions StateTransition[] @relation("TriggeringAction")
+  auditEvents           AuditEvent[]
+
+  @@index([incidentId])
+  @@index([incidentId, service, type])
+  @@index([status])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  incidentId String?
+  reportId   String?
+  actionId   String?
+  eventType  String
+  actor      String
+  details    Json
+  createdAt  DateTime @default(now())
+
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  report   Report?   @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  action   Action?   @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId])
+  @@index([reportId])
+  @@index([actionId])
+  @@index([createdAt])
+}
