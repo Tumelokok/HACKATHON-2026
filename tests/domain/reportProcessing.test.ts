@@ -27,6 +27,16 @@ describe("report processing pipeline", () => {
       1,
       first.correlationState,
       first.severityState,
+      first.conflictState,
+      first.lifecycleState,
+      {
+        fromState: "CREATED",
+        requestedState: "ASSESSING",
+        reason: "Begin deterministic evidence assessment.",
+        triggeringReportId: "R-002",
+        actor: "RULE_ENGINE",
+        requestedAt: "2026-09-20T10:01:00Z",
+      },
     );
 
     expect(first.passed).toBe(true);
@@ -39,6 +49,9 @@ describe("report processing pipeline", () => {
     expect(second.correlationResult.decision).toBe("EXISTING_INCIDENT");
     expect(second.severityAssessment?.level).toBe("MEDIUM");
     expect(second.conflictResult.conflictExists).toBe(false);
+    expect(second.lifecycleResult?.accepted).toBe(true);
+    expect(second.lifecycleState.records[0]?.currentState).toBe("ASSESSING");
+    expect(second.lifecycleState.records[0]?.history).toHaveLength(1);
     expect(second.correlationState.incidents[0]?.reportIds).toEqual([
       "R-001",
       "R-002",

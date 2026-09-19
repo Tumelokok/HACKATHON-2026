@@ -33,6 +33,16 @@ import type {
   ConflictResult,
   ConflictState,
 } from "@/domain/conflicts";
+import {
+  createLifecycleState,
+  ensureIncidentLifecycle,
+  processLifecycleTransition,
+} from "@/domain/lifecycle";
+import type {
+  LifecycleState,
+  LifecycleTransitionIntent,
+  LifecycleTransitionResult,
+} from "@/domain/lifecycle";
 
 export interface ReportProcessingResult extends ReportValidationResult {
   validatedReport: ValidatedReport | null;
@@ -43,6 +53,8 @@ export interface ReportProcessingResult extends ReportValidationResult {
   severityState: SeverityState;
   conflictResult: ConflictResult;
   conflictState: ConflictState;
+  lifecycleResult: LifecycleTransitionResult | null;
+  lifecycleState: LifecycleState;
 }
 
 export function createRawReport(
@@ -58,6 +70,8 @@ export function processReport(
   correlationState: CorrelationState = createCorrelationState(),
   severityState: SeverityState = createSeverityState(),
   conflictState: ConflictState = createConflictState(),
+  lifecycleState: LifecycleState = createLifecycleState(),
+  lifecycleIntent?: LifecycleTransitionIntent,
 ): ReportProcessingResult {
   const rawReport = { ...input, processingOrder };
   const validation = validateReport(rawReport);
@@ -95,6 +109,32 @@ export function processReport(
     },
     conflictState,
   );
+  const shouldEnsureLifecycle =
+    correlation.result.decision !== "DUPLICATE_REPORT" &&
+    correlation.result.matchStatus !== "AMBIGUOUS" &&
+    confirmedIncident !== undefined &&
+    processedCorrelationReport?.incidentId !== null;
+  const confirmedIncidentId = processedCorrelationReport?.incidentId ?? null;
+  const lifecycleStateWithIncident =
+    shouldEnsureLifecycle && confirmedIncidentId
+      ? ensureIncidentLifecycle(lifecycleState, confirmedIncidentId)
+      : lifecycleState;
+  const lifecycle =
+    shouldEnsureLifecycle && confirmedIncidentId && lifecycleIntent
+      ? processLifecycleTransition(
+          {
+            ...lifecycleIntent,
+            incidentId: confirmedIncidentId,
+            evidence: {
+              reports: confirmedIncident?.reports ?? [normalizedReport],
+              correlationResult: correlation.result,
+              severityAssessment: severity?.assessment ?? null,
+              conflictResult: conflict.result,
+            },
+          },
+          lifecycleStateWithIncident,
+        )
+      : null;
 
   return {
     ...validation,
@@ -105,5 +145,7 @@ export function processReport(
     severityState: severity?.state ?? severityState,
     conflictResult: conflict.result,
     conflictState: conflict.state,
+    lifecycleResult: lifecycle?.result ?? null,
+    lifecycleState: lifecycle?.state ?? lifecycleStateWithIncident,
   };
 }
