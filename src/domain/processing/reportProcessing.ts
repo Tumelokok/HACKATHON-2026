@@ -43,6 +43,12 @@ import type {
   LifecycleTransitionIntent,
   LifecycleTransitionResult,
 } from "@/domain/lifecycle";
+import {
+  createActionState,
+} from "@/domain/actions";
+import type { ActionState } from "@/domain/actions";
+import { createAgentContext } from "@/domain/agent";
+import type { AgentContext } from "@/domain/agent";
 
 export interface ReportProcessingResult extends ReportValidationResult {
   validatedReport: ValidatedReport | null;
@@ -55,6 +61,8 @@ export interface ReportProcessingResult extends ReportValidationResult {
   conflictState: ConflictState;
   lifecycleResult: LifecycleTransitionResult | null;
   lifecycleState: LifecycleState;
+  actionState: ActionState;
+  agentContext: AgentContext;
 }
 
 export function createRawReport(
@@ -72,6 +80,7 @@ export function processReport(
   conflictState: ConflictState = createConflictState(),
   lifecycleState: LifecycleState = createLifecycleState(),
   lifecycleIntent?: LifecycleTransitionIntent,
+  actionState: ActionState = createActionState(),
 ): ReportProcessingResult {
   const rawReport = { ...input, processingOrder };
   const validation = validateReport(rawReport);
@@ -135,6 +144,23 @@ export function processReport(
           lifecycleStateWithIncident,
         )
       : null;
+  const lifecycleRecord = confirmedIncidentId
+    ? lifecycleStateWithIncident.records.find((record) => record.incidentId === confirmedIncidentId)
+    : undefined;
+  const agentContext = createAgentContext({
+    incidentId: confirmedIncidentId,
+    incidentExists: confirmedIncident !== undefined,
+    lifecycleState: lifecycleRecord?.currentState ?? null,
+    lifecycleHistory: lifecycleRecord?.history ?? [],
+    correlationResult: correlation.result,
+    severityAssessment: severity?.assessment ?? null,
+    reports: confirmedIncident?.reports ?? [normalizedReport],
+    conflictRecords: conflict.state.records,
+    conflictResult: conflict.result,
+    actionState,
+    credibleResolutionEvidence: false,
+    processingOrder,
+  });
 
   return {
     ...validation,
@@ -147,5 +173,7 @@ export function processReport(
     conflictState: conflict.state,
     lifecycleResult: lifecycle?.result ?? null,
     lifecycleState: lifecycle?.state ?? lifecycleStateWithIncident,
+    actionState,
+    agentContext,
   };
 }

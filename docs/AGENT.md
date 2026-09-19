@@ -358,3 +358,62 @@ The agent implementation is successful when:
 * conflicts can trigger human review
 * the incident can continue through its lifecycle
 * the application remains authoritative over safety and state
+
+---
+
+# 19. Implemented Bounded Domain Boundary
+
+The deterministic agent subsystem lives under `src/domain/agent/` and is provider-independent.
+
+Its flow is:
+
+```text
+AgentContext
+      ↓
+AgentObservation
+      ↓
+AgentDecision
+      ↓
+ActionProposal
+      ↓
+Existing ActionPolicy
+```
+
+The agent does not execute actions, mutate incidents, access Prisma, or call external services.
+The application must submit any returned proposal to the existing action policy and executor.
+
+## 19.1 Deterministic Fallback
+
+When no model is configured, or when a model response fails validation, the agent uses deterministic fallback rules based on the existing domain context:
+
+* duplicate or missing incidents produce `NO_ACTION`
+* ambiguous or unresolved safety evidence requests human review
+* missing location requests location information
+* severe unresolved evidence proposes escalation
+* credible resolution evidence in monitoring can propose closure
+
+Fallback decisions preserve report IDs and concise reasons.
+
+## 19.2 Controlled Tools and Model Adapter
+
+Only the documented controlled tools are represented:
+
+```text
+get_incident
+update_incident
+assess_risk
+notify_security
+notify_trusted_contact
+request_location
+close_incident
+```
+
+Tool requests are structurally validated. Unknown tools, actions, states, and severity values are rejected.
+
+The optional `AgentModel` interface accepts a structured observation and returns `unknown`, which is validated before use. No provider SDK, API key, or network call is required.
+
+Incident descriptions and locations are evidence fields, not instructions. They are never interpolated into executable policy or tool definitions.
+
+## 19.3 Human Review and Auditability
+
+The agent can request human review but cannot fabricate approval. Agent observations, decisions, fallback use, rejected model output, and generated proposals are represented as append-only structured audit events without chain-of-thought.
