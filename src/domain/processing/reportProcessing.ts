@@ -9,10 +9,20 @@ import {
   validateReport,
 } from "@/domain/validation/reportValidation";
 import { normalizeReport } from "@/domain/normalization/reportNormalization";
+import {
+  createCorrelationState,
+  processCorrelatedReport,
+} from "@/domain/correlation";
+import type {
+  CorrelationResult,
+  CorrelationState,
+} from "@/domain/correlation";
 
 export interface ReportProcessingResult extends ReportValidationResult {
   validatedReport: ValidatedReport | null;
   normalizedReport: NormalizedReport;
+  correlationResult: CorrelationResult;
+  correlationState: CorrelationState;
 }
 
 export function createRawReport(
@@ -25,12 +35,17 @@ export function createRawReport(
 export function processReport(
   input: RawReportInput,
   processingOrder: number,
+  correlationState: CorrelationState = createCorrelationState(),
 ): ReportProcessingResult {
   const rawReport = { ...input, processingOrder };
   const validation = validateReport(rawReport);
+  const normalizedReport = normalizeReport(rawReport);
+  const correlation = processCorrelatedReport(normalizedReport, correlationState);
 
   return {
     ...validation,
-    normalizedReport: normalizeReport(rawReport),
+    normalizedReport,
+    correlationResult: correlation.result,
+    correlationState: correlation.state,
   };
 }
