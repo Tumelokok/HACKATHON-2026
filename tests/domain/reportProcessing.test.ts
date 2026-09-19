@@ -26,16 +26,23 @@ describe("report processing pipeline", () => {
       },
       1,
       first.correlationState,
+      first.severityState,
     );
 
     expect(first.passed).toBe(true);
     expect(first.normalizedReport.categoryNormalized).toBe("NETWORK_OUTAGE");
     expect(first.correlationResult.decision).toBe("NEW_INCIDENT");
+    expect(first.severityAssessment?.level).toBe("MEDIUM");
+    expect(first.severityAssessment?.source).toBe("RULE_ENGINE");
+    expect(first.conflictResult.conflictExists).toBe(false);
     expect(second.normalizedReport.locationNormalized).toBe("library level 2");
     expect(second.correlationResult.decision).toBe("EXISTING_INCIDENT");
+    expect(second.severityAssessment?.level).toBe("MEDIUM");
+    expect(second.conflictResult.conflictExists).toBe(false);
     expect(second.correlationState.incidents[0]?.reportIds).toEqual([
       "R-001",
       "R-002",
     ]);
+    expect(second.severityState.assessments).toHaveLength(2);
   });
 });
