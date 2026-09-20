@@ -341,6 +341,18 @@ export function createConflictState(): ConflictState {
   return { records: [] };
 }
 
+function dedupeSignals(signals: readonly ConflictSignal[]): ConflictSignal[] {
+  const seen = new Set<string>();
+  const result: ConflictSignal[] = [];
+  for (const item of signals) {
+    const key = `${item.type}|${[...item.reportIds].sort().join(",")}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}
+
 export function detectConflicts(input: ConflictInput): ConflictResult {
   if (
     input.correlationResult.decision !== "EXISTING_INCIDENT" ||
@@ -387,7 +399,9 @@ export function detectConflicts(input: ConflictInput): ConflictResult {
     return noConflict(input.incidentId);
   }
 
-  const orderedSignals = [...signals].sort((left, right) => right.confidence - left.confidence);
+  const orderedSignals = dedupeSignals(signals).sort(
+    (left, right) => right.confidence - left.confidence,
+  );
   const involvedReportIds = [...new Set(orderedSignals.flatMap((item) => item.reportIds))];
   const evidenceReports = input.reports.filter((report) => involvedReportIds.includes(report.report_id));
   const conflictType = orderedSignals[0].type;
