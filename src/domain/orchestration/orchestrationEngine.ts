@@ -82,6 +82,17 @@ export function orchestrateReport(input: OrchestrationInput): OrchestrationResul
     lifecycleResults.push(transition.result);
     if (!transition.result.accepted) break;
     if (transition.result.resultingState === "RESOLVED") break;
+    // Reopening is terminal for the current report cycle, symmetric with
+    // resolution. Otherwise a later report that reopens a resolved incident
+    // is immediately re-resolved in the same loop on the accumulated
+    // evidence of the older resolution report, undoing the reopen.
+    if (
+      transition.result.accepted &&
+      transition.result.fromState === "RESOLVED" &&
+      transition.result.resultingState !== "RESOLVED"
+    ) {
+      break;
+    }
   }
 
   const freshRecord = incidentId ? lifecycleState.records.find((record) => record.incidentId === incidentId) : undefined;
