@@ -4,8 +4,11 @@ import { orchestrateReport } from "@/domain/orchestration";
 import type { OrchestrationState } from "@/domain/orchestration";
 import type { RawReportInput } from "@/types/report";
 import { toPrediction } from "@/output/vocabulary";
+import { serviceForAction } from "@/output/serviceRouter";
 import type { Prediction, PredictedAction } from "@/output/types";
+import type { OrchestrationResult } from "@/domain/orchestration";
 import type {
+  DashboardAction,
   DashboardData,
   DashboardIncident,
   DashboardReport,
@@ -131,6 +134,27 @@ function collectServiceIds(actions: readonly PredictedAction[]): string[] {
   return [...ids].sort();
 }
 
+function buildDashboardActions(
+  result: OrchestrationResult,
+): DashboardAction[] {
+  // result.actionResults carries the policy decision and execution result
+  // for every action that went through the policy engine. The dashboard
+  // shows the domain action type (NOTIFY_SECURITY, ESCALATE_INCIDENT)
+  // rather than the JSONL-mapped type (DISPATCH, ESCALATE_RESPONSE)
+  // because it is more informative for a human reader. The JSONL contract
+  // is unaffected and still uses the mapped type.
+  return result.actionResults.map((actionResult) => ({
+    type: actionResult.proposal.actionType,
+    service_id: serviceForAction(actionResult.proposal.actionType) ?? null,
+    status: actionResult.execution?.status ?? actionResult.decision.status,
+    policyDecision: actionResult.decision.decision,
+    policyReason: actionResult.decision.reason,
+    executionStatus: actionResult.execution?.status ?? null,
+    executionResult: actionResult.execution?.result ?? null,
+    failureReason: actionResult.execution?.failureReason ?? null,
+  }));
+}
+
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const reports = loadReports(args.input);
@@ -159,7 +183,7 @@ function main(): void {
         result.processing.severityAssessment?.confidence ?? 0,
       correlationConfidence:
         result.processing.correlationResult.confidence,
-      actions: prediction.actions,
+      actions: buildDashboardActions(result),
       incident_status: prediction.incident_status,
       human_review: prediction.human_review,
       scene,

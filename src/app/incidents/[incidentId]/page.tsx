@@ -138,11 +138,13 @@ export default async function IncidentDetailPage({ params }: PageProps) {
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">Report</th>
-                    <th className="px-4 py-2 font-medium">Action</th>
-                    <th className="px-4 py-2 font-medium">Service</th>
-                  </tr>
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Report</th>
+                      <th className="px-4 py-2 font-medium">Action</th>
+                      <th className="px-4 py-2 font-medium">Service</th>
+                      <th className="px-4 py-2 font-medium">Status</th>
+                      <th className="px-4 py-2 font-medium">Reason</th>
+                    </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {allActions.map(({ report, action }, index) => (
@@ -155,6 +157,12 @@ export default async function IncidentDetailPage({ params }: PageProps) {
                       </td>
                       <td className="px-4 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">
                         {action.service_id ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-700 dark:text-slate-300">
+                        {action.status}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-slate-600 dark:text-slate-400">
+                        {action.policyReason ?? "—"}
                       </td>
                     </tr>
                   ))}

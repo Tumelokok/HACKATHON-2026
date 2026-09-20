@@ -88,8 +88,7 @@ export function orchestrateReport(input: OrchestrationInput): OrchestrationResul
     // evidence of the older resolution report, undoing the reopen.
     if (
       transition.result.accepted &&
-      transition.result.fromState === "RESOLVED" &&
-      transition.result.resultingState !== "RESOLVED"
+      transition.result.fromState === "RESOLVED"
     ) {
       break;
     }

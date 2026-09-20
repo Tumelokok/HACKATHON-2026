@@ -1,6 +1,5 @@
 import type { RawReportInput } from "@/types/report";
 import type {
-  PredictedAction,
   PredictedIncidentStatus,
   PredictedRelationship,
   PredictedSeverity,
@@ -42,6 +41,17 @@ export interface DashboardLifecycleTransition {
   reason: string;
 }
 
+export interface DashboardAction {
+  type: string;
+  service_id: string | null;
+  status: "PROPOSED" | "APPROVED" | "REJECTED" | "EXECUTED" | "FAILED" | "SUPPRESSED";
+  policyDecision: "APPROVED" | "REJECTED" | "SUPPRESSED" | null;
+  policyReason: string | null;
+  executionStatus: "EXECUTED" | "FAILED" | null;
+  executionResult: string | null;
+  failureReason: string | null;
+}
+
 export interface DashboardReport {
   report_id: string;
   processingOrder: number;
@@ -50,7 +60,7 @@ export interface DashboardReport {
   severity: PredictedSeverity;
   severityConfidence: number;
   correlationConfidence: number;
-  actions: readonly PredictedAction[];
+  actions: readonly DashboardAction[];
   incident_status: PredictedIncidentStatus;
   human_review: boolean;
   scene: SceneName;
