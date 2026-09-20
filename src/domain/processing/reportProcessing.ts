@@ -94,7 +94,6 @@ export function processReport(
     : undefined;
   const shouldAssessSeverity =
     correlation.result.decision !== "DUPLICATE_REPORT" &&
-    correlation.result.matchStatus !== "AMBIGUOUS" &&
     confirmedIncident !== undefined &&
     processedCorrelationReport?.incidentId !== null;
   const severity = shouldAssessSeverity && confirmedIncident && processedCorrelationReport
