@@ -408,13 +408,19 @@ export function applyCorrelationResult(
     };
   }
 
-  if (result.matchStatus === "AMBIGUOUS") {
+    if (result.matchStatus === "AMBIGUOUS") {
+    // Ambiguous matches are still reported to the incident. The
+    // humanReview flag on the correlation result is what signals
+    // uncertainty; refusing to attach the report would orphan it.
+    const incidents = state.incidents.map((candidate) =>
+      candidate.incidentId === result.incidentId
+        ? addReportToIncident(candidate, report)
+        : candidate,
+    );
+
     return {
-      ...state,
-      processedReports: [
-        ...state.processedReports,
-        { ...processedReport, incidentId: null },
-      ],
+      processedReports: [...state.processedReports, processedReport],
+      incidents,
     };
   }
 

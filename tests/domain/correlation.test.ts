@@ -253,7 +253,7 @@ describe("incident correlation", () => {
     expect(ambiguous.result.candidateScores).toHaveLength(1);
   });
 
-  it("does not apply an ambiguous match to the confirmed incident", () => {
+  it("attaches an ambiguous match to the incident and flags it for human review", () => {
     let state = createCorrelationState();
     state = processCorrelatedReport(report(), state).state;
 
@@ -266,13 +266,16 @@ describe("incident correlation", () => {
       state,
     );
 
+    // Ambiguous matches are still attached to the best candidate incident.
+    // The humanReview flag is what signals the uncertainty; refusing to
+    // attach the report would orphan evidence that clearly belongs to
+    // an existing incident.
     expect(ambiguous.result.matchStatus).toBe("AMBIGUOUS");
     expect(ambiguous.result.humanReview.required).toBe(true);
-    expect(ambiguous.state.incidents[0]?.reportIds).toEqual(["R-001"]);
-    expect(ambiguous.state.processedReports[1]?.incidentId).toBeNull();
-    expect(ambiguous.state.processedReports[1]?.candidateIncidentIds).toEqual([
+    expect(ambiguous.state.incidents[0]?.reportIds).toEqual(["R-001", "R-002"]);
+    expect(ambiguous.state.processedReports[1]?.incidentId).toBe(
       "incident-R-001",
-    ]);
+    );
   });
 
   it("associates a category-changing resolution report", () => {
