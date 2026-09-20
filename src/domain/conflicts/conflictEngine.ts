@@ -163,6 +163,60 @@ function findFactualSignals(
       );
     }
   }
+  // Authorization claims and an inability to verify are a factual
+  // contradiction. This is the contractor-verification pattern: one
+  // report asserts that access is authorized, while another states
+  // that the authorization cannot be verified. The existing negation
+  // mechanism does not catch this because the two reports do not
+  // negate the same concept — they make incompatible positive claims
+  // about the same access decision.
+  const authorizationTerms = [
+    "authorized",
+    "authorised",
+    "authorization",
+    "authorisation",
+    "approved access",
+    "permitted access",
+  ] as const;
+  const verificationFailureTerms = [
+    "cannot verify",
+    "unable to verify",
+    "cannot confirm",
+    "unable to confirm",
+    "unverified",
+    "no verification",
+  ] as const;
+
+  const earlierText = earlier.descriptionRaw.toLowerCase();
+  const currentText = current.descriptionRaw.toLowerCase();
+
+  const earlierAuthorized = authorizationTerms.some((term) =>
+    earlierText.includes(term),
+  );
+  const currentAuthorized = authorizationTerms.some((term) =>
+    currentText.includes(term),
+  );
+  const earlierUnverified = verificationFailureTerms.some((term) =>
+    earlierText.includes(term),
+  );
+  const currentUnverified = verificationFailureTerms.some((term) =>
+    currentText.includes(term),
+  );
+
+  if (
+    (earlierAuthorized && currentUnverified) ||
+    (earlierUnverified && currentAuthorized)
+  ) {
+    signals.push(
+      signal(
+        "FACTUAL_CONTRADICTION",
+        earlier,
+        current,
+        conflictConfidence.factual,
+        "one report asserts authorization while the other states that authorization cannot be verified",
+      ),
+    );
+  }
 
   return signals;
 }
