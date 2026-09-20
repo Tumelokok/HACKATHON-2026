@@ -15,7 +15,7 @@ function allReports(trace: readonly import("./types").ReplayReportResult[]): str
 }
 
 function networkAssertions(trace: readonly import("./types").ReplayReportResult[]): ReplayAssertion[] {
-  const incidentId = trace[0]?.incidentId;
+  const incidentId = trace.find((item) => item.incidentId !== null)?.incidentId;
   return [
     assertion("incident-correlation", "Network follow-ups remain on one incident", trace.filter((item) => item.incidentId === incidentId).length >= 3, allReports(trace)),
     assertion("incident-correlation", "A duplicate report is identified", trace.some((item) => item.duplicate), [trace.find((item) => item.duplicate)?.reportId ?? "none"]),
@@ -43,7 +43,7 @@ function liftAssertions(trace: readonly import("./types").ReplayReportResult[]):
   return [
     assertion("incident-correlation", "Lift reports correlate into one incident", new Set(trace.filter((item) => item.incidentId).map((item) => item.incidentId)).size === 1, allReports(trace)),
     assertion("actions-services", "Maintenance action is policy-reviewed", trace.some((item) => item.actions.some((action) => action.actionType === "NOTIFY_MAINTENANCE")), allReports(trace)),
-    assertion("resolution", "Lifecycle can record a resolution or reopening", trace.some((item) => item.lifecycle?.resultingState === "RESOLVED" || item.lifecycle?.fromState === "RESOLVED"), allReports(trace)),
+        assertion("resolution", "Lifecycle can record a resolution or reopening", trace.some((item) => item.lifecycle.some((result) => result.resultingState === "RESOLVED" || result.fromState === "RESOLVED")), allReports(trace)),
   ];
 }
 
@@ -84,13 +84,19 @@ export const replayScenarios: readonly ReplayScenario[] = [
     ],
     assertions: [contractorAssertions],
   },
-  {
+
+    {
+    // LFT-003 describes an operational state (maintenance on-site) during
+    // an active trapped-passenger incident. It does not assert a lower
+    // severity, so it must not inherit base.reported_severity = "low" —
+    // doing so creates a spurious SEVERITY_CONTRADICTION that blocks
+    // credible resolution in the lifecycle engine.
     name: "LIFT_ACCESSIBILITY",
     description: "Lift failure, accessibility impact, maintenance response, resolution, and renewed evidence.",
     inputs: [
       { report: { ...base, report_id: "LFT-001", category: "Lift", reported_severity: "high", description: "A passenger is trapped in the lift." } },
       { report: { ...base, report_id: "LFT-002", category: "Lift", reported_severity: "high", description: "The lift failure is affecting wheelchair access." } },
-      { report: { ...base, report_id: "LFT-003", category: "Lift", description: "Maintenance has arrived and is working on the lift." } },
+            { report: { ...base, report_id: "LFT-003", category: "Lift", reported_severity: "high", description: "Maintenance has arrived and is working on the lift." } },
       { report: { ...base, report_id: "LFT-004", category: "Lift", reported_severity: "low", description: "Passenger released, lift repaired and tested." } },
       { report: { ...base, report_id: "LFT-005", category: "Lift", reported_severity: "high", description: "Person trapped in the lift again." } },
     ],

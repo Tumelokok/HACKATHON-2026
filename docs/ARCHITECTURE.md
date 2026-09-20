@@ -21,6 +21,28 @@ The application owns the system state.
 
 The AI agent operates inside controlled application boundaries.
 
+## Application Orchestration Layer
+
+The application orchestration layer coordinates the deterministic engines after report processing and before any simulated action execution:
+
+```text
+Processed Report
+    ↓
+Orchestration Context
+    ↓
+Lifecycle Intent → Lifecycle Engine
+    ↓
+Agent Observation / Deterministic Fallback
+    ↓
+Action Proposal → Action Policy → Simulated Executor
+    ↓
+Audit and Immutable State
+```
+
+The orchestrator does not replace domain authority. Correlation, severity, conflict detection, lifecycle validation, action policy, and execution remain owned by their respective engines. It may recommend a lifecycle intent or action, but it must pass those requests through the authoritative validator before state or action changes occur.
+
+Reports remain untrusted evidence, timestamps never determine processing order, and ambiguous or duplicate correlation results cannot mutate a confirmed incident or dispatch an action.
+
 ---
 
 # 2. High-Level Architecture

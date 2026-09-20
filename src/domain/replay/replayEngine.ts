@@ -1,11 +1,5 @@
-import { runAgent } from "@/domain/agent";
-import { executeApprovedAction, submitActionProposal } from "@/domain/actions";
-import { processReport } from "@/domain/processing/reportProcessing";
-import type { ActionState } from "@/domain/actions";
-import type { CorrelationState } from "@/domain/correlation";
-import type { ConflictState } from "@/domain/conflicts";
-import type { LifecycleState } from "@/domain/lifecycle";
-import type { SeverityState } from "@/domain/severity";
+import { orchestrateReport } from "@/domain/orchestration";
+import type { OrchestrationState } from "@/domain/orchestration";
 import type { ReplayEvaluation, ReplayReportResult, ReplayScenario, ReplaySummary } from "./types";
 
 function emptySummary(): ReplaySummary {
@@ -24,79 +18,33 @@ function emptySummary(): ReplaySummary {
 }
 
 export function replayScenario(scenario: ReplayScenario): ReplayEvaluation {
-  let correlationState: CorrelationState | undefined;
-  let severityState: SeverityState | undefined;
-  let conflictState: ConflictState | undefined;
-  let lifecycleState: LifecycleState | undefined;
-  let actionState: ActionState | undefined;
+  let state: OrchestrationState | undefined;
   const trace: ReplayReportResult[] = [];
   const errors: string[] = [];
   const summary = emptySummary();
 
   scenario.inputs.forEach((input, processingOrder) => {
-    const processed = processReport(
-      input.report,
-      processingOrder,
-      correlationState,
-      severityState,
-      conflictState,
-      lifecycleState,
-      input.lifecycleIntent,
-      actionState,
-    );
-    correlationState = processed.correlationState;
-    severityState = processed.severityState;
-    conflictState = processed.conflictState;
-    lifecycleState = processed.lifecycleState;
-    actionState = processed.actionState;
-
-    const agent = runAgent(processed.agentContext, input.report.timestamp);
-    let currentActionState = actionState;
-    const actionSnapshots: ReplayReportResult["actions"] extends readonly (infer ActionSnapshot)[]
-      ? ActionSnapshot[]
-      : never = [];
-    if (agent.decision.actionProposal) {
-      summary.actionsProposed += 1;
-      const proposalResult = submitActionProposal(
-        agent.decision.actionProposal,
-        {
-          incidentExists: processed.agentContext.incidentExists,
-          incidentId: processed.agentContext.incidentId ?? "",
-          incidentState: processed.agentContext.incidentState ?? "CREATED",
-          severity: processed.agentContext.severity,
-          conflictResult: processed.agentContext.currentConflict,
-          reports: processed.agentContext.reports,
-          correlationDecision: processed.agentContext.correlationDecision,
-          correlationMatchStatus: processed.agentContext.correlationMatchStatus,
-          credibleResolutionEvidence: processed.agentContext.credibleResolutionEvidence,
-        },
-        currentActionState,
-      );
-      currentActionState = proposalResult.state;
-      let execution = null;
-      if (proposalResult.policy.decision === "APPROVED") {
-        const executed = executeApprovedAction(proposalResult.proposal.actionId, currentActionState);
-        currentActionState = executed.state;
-        execution = executed.result;
-      }
-      if (proposalResult.policy.decision === "SUPPRESSED") summary.actionsSuppressed += 1;
-      if (execution?.status === "EXECUTED") summary.actionsExecuted += 1;
-      actionSnapshots.push({
-        actionId: proposalResult.proposal.actionId,
-        actionType: proposalResult.proposal.actionType,
-        status: execution?.status ?? proposalResult.policy.status,
-        policy: proposalResult.policy,
-        execution,
-      });
-    }
-    actionState = currentActionState;
+    const orchestration = orchestrateReport({ report: input.report, processingOrder, state });
+    state = orchestration.state;
+    const processed = orchestration.processing;
+    const agent = orchestration.agent;
+    const actionSnapshots = orchestration.actionResults.map((result) => ({
+      actionId: result.proposal.actionId,
+      actionType: result.proposal.actionType,
+      status: result.execution?.status ?? result.decision.status,
+      policy: result.decision,
+      execution: result.execution,
+    }));
+    summary.actionsProposed += orchestration.actionProposals.length;
+    summary.actionsSuppressed += orchestration.suppressedActions.length;
+    summary.actionsExecuted += orchestration.executedActions.filter((execution) => execution.status === "EXECUTED").length;
 
     if (processed.correlationResult.decision === "NEW_INCIDENT") summary.incidentsCreated += 1;
     if (processed.correlationResult.decision === "DUPLICATE_REPORT") summary.duplicatesDetected += 1;
     if (processed.conflictResult.conflictExists) summary.conflictsDetected += 1;
     if (agent.decision.decisionType === "REQUEST_HUMAN_REVIEW") summary.humanReviewsRequested += 1;
-    if (processed.lifecycleResult?.accepted && processed.lifecycleResult.resultingState === "RESOLVED") summary.resolvedIncidents += 1;
-    if (processed.lifecycleResult?.accepted && processed.lifecycleResult.fromState === "RESOLVED") summary.reopenedIncidents += 1;
+    if (orchestration.lifecycleResults.some((result) => result.accepted && result.resultingState === "RESOLVED")) summary.resolvedIncidents += 1;
+    if (orchestration.lifecycleResults.some((result) => result.accepted && result.fromState === "RESOLVED")) summary.reopenedIncidents += 1;
 
     trace.push({
       processingOrder,
@@ -110,15 +58,15 @@ export function replayScenario(scenario: ReplayScenario): ReplayEvaluation {
       duplicate: processed.correlationResult.decision === "DUPLICATE_REPORT",
       severity: processed.severityAssessment,
       conflicts: processed.conflictResult,
-      lifecycle: processed.lifecycleResult,
-      lifecycleState: processed.lifecycleState,
+      lifecycle: orchestration.lifecycleResults,
+      lifecycleState: orchestration.lifecycleState,
       actions: actionSnapshots,
       agent,
       auditEvents: [
-        ...agent.auditEvents.map((event) => event.eventType),
-        ...currentActionState.auditEvents.map((event) => event.eventType),
+        ...orchestration.auditEvents.map((event) => event.eventType),
+        ...orchestration.state.actionState.auditEvents.map((event) => event.eventType),
       ],
-      errors: processed.issues.map((issue) => issue.message),
+      errors: orchestration.errors,
     });
   });
 
@@ -163,7 +111,7 @@ export function normalizeReplayEvaluation(evaluation: ReplayEvaluation): unknown
       },
       severity: item.severity ? { level: item.severity.level, confidence: item.severity.confidence, evidenceReportIds: item.severity.evidenceReportIds } : null,
       conflicts: { conflictExists: item.conflicts.conflictExists, conflictType: item.conflicts.conflictType, involvedReportIds: item.conflicts.involvedReportIds, requiresHumanReview: item.conflicts.requiresHumanReview },
-      lifecycle: item.lifecycle ? { accepted: item.lifecycle.accepted, fromState: item.lifecycle.fromState, resultingState: item.lifecycle.resultingState, transitionId: item.lifecycle.transitionId } : null,
+      lifecycle: item.lifecycle.map((result) => ({ accepted: result.accepted, fromState: result.fromState, resultingState: result.resultingState, transitionId: result.transitionId })),
       actions: item.actions.map((action) => ({ actionId: action.actionId, actionType: action.actionType, status: action.status, policyDecision: action.policy?.decision, executionStatus: action.execution?.status })),
       agent: { decisionType: item.agent.decision.decisionType, confidence: item.agent.decision.confidence, actionType: item.agent.decision.actionProposal?.actionType ?? null, fallbackUsed: item.agent.decision.fallbackUsed },
       auditEvents: item.auditEvents,

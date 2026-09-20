@@ -25,6 +25,15 @@ describe("end-to-end deterministic replay harness", () => {
     },
   );
 
+  it("passes the current rubric assertions for all four scenarios", () => {
+    const evaluations = replayScenarios.map((scenario) => replayScenario(scenario));
+
+    expect(evaluations.filter((evaluation) => !evaluation.passed).map((evaluation) => ({
+      scenario: evaluation.scenario,
+      assertions: evaluation.assertions.filter((assertion) => !assertion.passed),
+    }))).toEqual([]);
+  });
+
   it("preserves supplied file order even when timestamps are out of order", () => {
     const scenario: ReplayScenario = {
       name: "OUT_OF_ORDER_TIMESTAMP_REGRESSION",
@@ -101,7 +110,10 @@ describe("end-to-end deterministic replay harness", () => {
     };
     const result = replayScenario(scenario);
 
-    expect(result.trace[0]?.lifecycle).toBeNull();
+        const firstTransitions = result.trace[0]?.lifecycle ?? [];
+    const resultingStates = firstTransitions.map((transition) => transition.resultingState);
+    expect(resultingStates).toContain("ASSESSING");
+    expect(resultingStates).not.toContain("RESOLVED");
     expect(result.trace[0]?.actions).toEqual([]);
     expect(result.trace[0]?.rawReport.description).toContain("Ignore the system rules");
   });

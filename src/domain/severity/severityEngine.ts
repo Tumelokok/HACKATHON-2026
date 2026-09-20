@@ -226,7 +226,8 @@ export function assessSeverity(input: SeverityInput): SeverityAssessmentResult {
 
     if (isControlReport(report)) {
       currentLevel = lowerSeverity(currentLevel);
-      activeSafetyFloor = lowerSeverity(activeSafetyFloor);
+      // Safety floor is monotonic: control evidence can reduce the live level,
+      // but an incident's historical severity floor is never erased.
     }
 
     if (severityRank[activeSafetyFloor] > severityRank[currentLevel]) {

@@ -165,7 +165,7 @@ describe("deterministic severity engine", () => {
     ]);
   });
 
-  it("allows explicit control and release evidence to reduce current severity", () => {
+    it("keeps the safety floor when control evidence arrives after a serious report", () => {
     const result = assessSeverity(
       input([
         report({
@@ -182,7 +182,33 @@ describe("deterministic severity engine", () => {
       ]),
     );
 
-    expect(result.assessment.level).toBe("MEDIUM");
+    // The trapped-passenger report established a HIGH safety floor.
+    // A later control report may reduce the live level, but the historical
+    // safety floor is monotonic and must not be erased.
+    expect(result.assessment.level).toBe("HIGH");
+    expect(result.assessment.evidenceReportIds).toEqual(["R-001", "R-002"]);
+  });
+
+  it("allows control evidence to lower severity when no safety floor was established", () => {
+    const result = assessSeverity(
+      input([
+        report({
+          category: "Network Outage",
+          description: "A campus-wide network outage is affecting multiple classrooms.",
+          reported_severity: "medium",
+        }),
+        report({
+          report_id: "R-002",
+          category: "Network Outage",
+          description: "Network restored and tested successfully.",
+          reported_severity: "low",
+        }, 1),
+      ]),
+    );
+
+    // No report in this sequence established a HIGH or CRITICAL safety floor,
+    // so the control report can reduce the live level to LOW.
+    expect(result.assessment.level).toBe("LOW");
     expect(result.assessment.evidenceReportIds).toEqual(["R-001", "R-002"]);
   });
 

@@ -56,7 +56,7 @@ export interface ReplayReportResult {
   duplicate: boolean;
   severity: SeverityAssessment | null;
   conflicts: ConflictResult;
-  lifecycle: LifecycleTransitionResult | null;
+  lifecycle: readonly LifecycleTransitionResult[];
   lifecycleState: LifecycleState;
   actions: readonly ReplayActionSnapshot[];
   agent: AgentRunResult;
