@@ -68,6 +68,9 @@ export interface DashboardIncident {
   location: string;
   currentSeverity: PredictedSeverity;
   currentStatus: PredictedIncidentStatus;
+  currentConfidence: number;
+  services: readonly string[];
+  human_review: boolean;
   reportIds: string[];
   firstProcessingOrder: number;
 }

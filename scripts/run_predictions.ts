@@ -4,7 +4,7 @@ import { orchestrateReport } from "@/domain/orchestration";
 import type { OrchestrationState } from "@/domain/orchestration";
 import type { RawReportInput } from "@/types/report";
 import { toPrediction } from "@/output/vocabulary";
-import type { Prediction } from "@/output/types";
+import type { Prediction, PredictedAction } from "@/output/types";
 import type {
   DashboardData,
   DashboardIncident,
@@ -123,6 +123,14 @@ function writeJsonl(path: string, predictions: readonly Prediction[]): void {
   writeFileSync(path, lines.join("\n") + "\n", "utf8");
 }
 
+function collectServiceIds(actions: readonly PredictedAction[]): string[] {
+  const ids = new Set<string>();
+  for (const action of actions) {
+    if (action.service_id) ids.add(action.service_id);
+  }
+  return [...ids].sort();
+}
+
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const reports = loadReports(args.input);
@@ -190,12 +198,16 @@ function main(): void {
       const existing = incidents.get(prediction.incident_id);
       if (existing) {
         existing.reportIds.push(prediction.report_id);
-        if (
-          prediction.severity !== existing.currentSeverity
-        ) {
-          existing.currentSeverity = prediction.severity;
-        }
+        existing.currentSeverity = prediction.severity;
         existing.currentStatus = prediction.incident_status;
+        existing.currentConfidence = prediction.confidence;
+        existing.human_review = existing.human_review || prediction.human_review;
+        existing.services = [
+          ...new Set([
+            ...existing.services,
+            ...collectServiceIds(prediction.actions),
+          ]),
+        ].sort();
       } else {
         incidents.set(prediction.incident_id, {
           incident_id: prediction.incident_id,
@@ -204,6 +216,9 @@ function main(): void {
           location: result.report.locationRaw,
           currentSeverity: prediction.severity,
           currentStatus: prediction.incident_status,
+          currentConfidence: prediction.confidence,
+          services: collectServiceIds(prediction.actions),
+          human_review: prediction.human_review,
           reportIds: [prediction.report_id],
           firstProcessingOrder: processingOrder,
         });
