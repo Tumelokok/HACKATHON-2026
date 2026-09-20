@@ -51,6 +51,7 @@ export default function Home() {
                 incidentCount={counts[scene]}
               />
             ))}
+            <AllIncidentsTile incidentCount={summary.incidents} />
           </div>
         </section>
 
@@ -117,6 +118,28 @@ function SceneTile({
       </div>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
         {sceneDescription(scene)}
+      </p>
+    </Link>
+  );
+}
+
+function AllIncidentsTile({ incidentCount }: { incidentCount: number }) {
+  return (
+    <Link
+      href="/incidents"
+      className="group rounded-lg border border-slate-200 bg-white p-5 transition-colors hover:border-orange-400 hover:bg-orange-50/50 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-orange-500 dark:hover:bg-slate-800"
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+          All incidents
+        </h3>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          {incidentCount} incident{incidentCount === 1 ? "" : "s"}
+        </span>
+      </div>
+      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+        Every incident in processing order, including those outside the four
+        judge scenarios.
       </p>
     </Link>
   );

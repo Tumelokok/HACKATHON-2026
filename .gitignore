@@ -16,3 +16,4 @@ predictions.jsonl
 prisma/*.db
 prisma/*.db-journal
 dashboard-data.json
+next-env.d.ts
