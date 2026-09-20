@@ -11,7 +11,19 @@ function hasAny(reports: readonly NormalizedReport[], terms: readonly string[]):
 }
 
 function hasResolutionEvidence(reports: readonly NormalizedReport[]): boolean {
-  return hasAny(reports, ["repaired and tested", "repair completed", "restored and tested", "hazard removed", "incident confirmed resolved", "fire extinguished"]);
+  // Keep this in step with the lifecycle engine's resolution evidence list.
+  // A report that declares itself "resolved" or "controlled" is explicitly
+  // signalling that the immediate danger has ended.
+  return hasAny(reports, [
+    "repaired and tested",
+    "repair completed",
+    "restored and tested",
+    "hazard removed",
+    "incident confirmed resolved",
+    "fire extinguished",
+    "resolved",
+    "controlled",
+  ]);
 }
 
 export function isSerious(severity: SeverityLevel | null): boolean {

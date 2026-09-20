@@ -12,3 +12,6 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+predictions.jsonl
+prisma/*.db
+prisma/*.db-journal

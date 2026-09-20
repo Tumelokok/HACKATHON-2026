@@ -110,6 +110,85 @@ describe("incident correlation", () => {
     expect(duplicate.state.incidents[0]?.reportIds).toEqual(["R-001"]);
   });
 
+  it("classifies a report with an explicit duplicate marker as DUPLICATE_REPORT", () => {
+    const first = processCorrelatedReport(
+      report({
+        report_id: "R-010",
+        location: "Library Level 2",
+        category: "facilities",
+        description: "Water is pooling near the study desks.",
+      }),
+      createCorrelationState(),
+    );
+
+    const second = processCorrelatedReport(
+      report({
+        report_id: "R-011",
+        location: "Library Level 2",
+        category: "facilities",
+        description: "Duplicate report: water beside the level two printers.",
+      }, 1),
+      first.state,
+    );
+
+    expect(second.result.decision).toBe("DUPLICATE_REPORT");
+    expect(second.result.duplicate?.originalReportId).toBe("R-010");
+    expect(second.result.duplicate?.originalIncidentId).toBe(
+      first.state.incidents[0]?.incidentId,
+    );
+    expect(second.result.incidentId).toBe(
+      first.state.incidents[0]?.incidentId,
+    );
+  });
+
+  it("does not classify a report as duplicate when it lacks an explicit marker", () => {
+    const first = processCorrelatedReport(
+      report({
+        report_id: "R-020",
+        location: "Library Level 2",
+        category: "facilities",
+        description: "Water is pooling near the study desks.",
+      }),
+      createCorrelationState(),
+    );
+
+    const second = processCorrelatedReport(
+      report({
+        report_id: "R-021",
+        location: "Library Level 2",
+        category: "facilities",
+        description: "Another student reports the same wet floor beside the printers.",
+      }, 1),
+      first.state,
+    );
+
+    expect(second.result.decision).toBe("EXISTING_INCIDENT");
+  });
+
+  it("does not classify a report as duplicate when its location or category differs", () => {
+    const first = processCorrelatedReport(
+      report({
+        report_id: "R-030",
+        location: "Library Level 2",
+        category: "facilities",
+        description: "Water is pooling near the study desks.",
+      }),
+      createCorrelationState(),
+    );
+
+    const second = processCorrelatedReport(
+      report({
+        report_id: "R-031",
+        location: "Engineering Block E3",
+        category: "fire",
+        description: "Duplicate report: unrelated description.",
+      }, 1),
+      first.state,
+    );
+
+    expect(second.result.decision).not.toBe("DUPLICATE_REPORT");
+  });
+
   it("keeps a meaningful follow-up associated with the existing incident", () => {
     let state = createCorrelationState();
     state = processCorrelatedReport(report(), state).state;

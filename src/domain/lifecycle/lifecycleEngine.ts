@@ -29,6 +29,11 @@ const resolutionPhrases = [
   ["fire", "extinguished", "inspected"],
   ["incident", "confirmed", "resolved"],
   ["restored", "tested"],
+  // A report that declares the incident "resolved" or "controlled" is
+  // explicitly signalling that the immediate danger has ended. This is
+  // the resolution convention used by the development corpus.
+  ["resolved"],
+  ["controlled"],
 ] as const;
 
 const escalationIndicators = [

@@ -59,6 +59,21 @@ const followUpConcepts = [
   ["control", "controlled"],
 ] as const;
 
+// Explicit duplicate markers. A reporter who resubmits the same information
+// labels it as a duplicate. This is the reliable signal for detecting
+// semantic duplicates without relying on identical report IDs.
+const duplicateMarkers = [
+  "duplicate report",
+  "duplicate:",
+  "repeat report",
+  "repeated report",
+] as const;
+
+function isDeclaredDuplicate(report: NormalizedReport): boolean {
+  const text = report.descriptionRaw.toLowerCase();
+  return duplicateMarkers.some((marker) => text.includes(marker));
+}
+
 const contextIndicators = [
   "additional",
   "affected",
@@ -280,6 +295,18 @@ export function correlateReport(
   );
   if (original) {
     return duplicateResult(report, original);
+  }
+
+    if (isDeclaredDuplicate(report)) {
+    const declaredOriginal = state.processedReports.find(
+      (processedReport) =>
+        processedReport.duplicateOfReportId === null &&
+        processedReport.report.locationNormalized === report.locationNormalized &&
+        processedReport.report.categoryNormalized === report.categoryNormalized,
+    );
+    if (declaredOriginal) {
+      return duplicateResult(report, declaredOriginal);
+    }
   }
 
   const candidateScores = state.incidents
