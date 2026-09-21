@@ -89,7 +89,7 @@ checks and reports.
 | Incoming Report | `/incidents/[id]` | Latest report and current assessment at the top of each incident |
 | Decision Log | `/decisions` | Every processed report in supplied order, filterable by scene and relationship |
 | Incident Summary | `/incidents` | Current type, location, severity, confidence, services, status, and review flag for every incident |
-| Action History | `/incidents/[id]` | Actions per report with service, and whether each was a new action or a continued response |
+| Action History | `/actions` | Every action that entered the policy engine, with report, incident, time, action, service, status, and policy reason; filterable by status and action type |
 | Replay | `/replay` | The four judge scenarios run through the same pipeline, with per-report trace and per-assertion results |
 
 ## Input data
