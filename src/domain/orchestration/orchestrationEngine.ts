@@ -98,8 +98,22 @@ export function orchestrateReport(input: OrchestrationInput): OrchestrationResul
   const context = createAgentContext({ incidentId, incidentExists: processing.agentContext.incidentExists, lifecycleState: freshRecord?.currentState ?? null, lifecycleHistory: freshRecord?.history ?? [], correlationResult: processing.correlationResult, severityAssessment: processing.severityAssessment, reports: processing.agentContext.reports, conflictRecords: processing.conflictState.records, conflictResult: processing.conflictResult, actionState: state.actionState, credibleResolutionEvidence: hasCredibleResolutionEvidence(processing.agentContext.reports), processingOrder: input.processingOrder });
   const agent = runAgent(context, input.report.timestamp, input.model);
   const suggestions = actionSuggestions(context.reports, processing.severityAssessment, processing.conflictResult.requiresHumanReview);
-  const proposalInputs = [...suggestions];
-  if (agent.decision.actionProposal && !proposalInputs.some((suggestion) => suggestion.actionType === agent.decision.actionProposal?.actionType)) {
+  // actionSuggestions can produce the same action type from more than one
+  // branch. For example, a high-severity security incident with uncertain
+  // contractor verification suggests NOTIFY_SECURITY both from the
+  // safety-evidence branch and from the contractor-verification branch.
+  // The policy engine correctly suppresses the second one as a duplicate,
+  // but keeping both in the results array shows the same action twice in
+  // the Action History view. Deduplicate by action type, keeping the first
+  // occurrence so the order and the highest-level reason are preserved.
+  const seenActionTypes = new Set<string>();
+  const proposalInputs: { actionType: ActionProposal["actionType"]; reason: string }[] = [];
+  for (const suggestion of suggestions) {
+    if (seenActionTypes.has(suggestion.actionType)) continue;
+    seenActionTypes.add(suggestion.actionType);
+    proposalInputs.push(suggestion);
+  }
+  if (agent.decision.actionProposal && !seenActionTypes.has(agent.decision.actionProposal.actionType)) {
     proposalInputs.push({ actionType: agent.decision.actionProposal.actionType, reason: agent.decision.actionProposal.reason });
   }
   let actionState: ActionState = state.actionState;
